@@ -13,20 +13,25 @@ let pp_list pp_elt fmt = function
       pp fmt "%a" pp_elt e1;
       List.iter (pp fmt ";@ %a" pp_elt) en;
       pp fmt "@,]@]"
-let pp_s fmt = pp fmt "%S"
+let pp_l pp_elt fmt = function
+    [] -> ()
+  | e1::en ->
+      pp fmt "@[<hov>";
+      pp fmt "%a" pp_elt e1;
+      List.iter (pp fmt ",@ %a" pp_elt) en;
+      pp fmt "@]"
+let pp_S fmt = pp fmt "%S"
+let pp_s = Format.pp_print_string
 let pp_pair pp1 pp2 fmt (e1,e2) =
   pp fmt "(%a,@ %a)" pp1 e1 pp2 e2
 
-let logger lv =
-  let msg lv' fmt =
-    if lv' <= lv
-    then Format.printf ("@["^^fmt^^"@]@.")
-    else Format.ifprintf Format.std_formatter fmt
-  in
-  msg
-
 let failprintf fmt =
-  Format.ksprintf failwith fmt
+  let b = Buffer.create 3 in
+  let f = Format.formatter_of_buffer b in
+  let fail _ =
+    failwith (Buffer.contents b)
+  in
+  Format.kfprintf fail f ("@["^^fmt^^"@]@.")
 
 let default_paths = ["/lib"; "/usr/lib"]
 
@@ -89,11 +94,33 @@ let parse_args argv =
   (!verbose,output,!files)
 ;;
 
+let find (f,paths) =
+  match f with
+      Obj fn ->
+        if Sys.file_exists fn then f
+        else failprintf "cannot find %S" fn
+    | Lib n ->
+        let fn = Format.sprintf "lib%s.a" n in
+        let paths = List.rev paths in
+        let fns = List.map (fun d -> Filename.concat d fn) paths in
+        let fn =
+          try List.find Sys.file_exists fns
+          with Not_found -> failprintf "cannot find %S in %a" fn (pp_l pp_s) paths
+        in
+        Lib fn
+;;
+
 let main () =
   let argv = Sys.argv in
   let verbose,output,files = parse_args argv in
-  let debug = logger verbose in
-  let () = debug 1 "v:%d@ o:%S@ fs:%a" verbose output (pp_list (pp_pair pp_file (pp_list pp_s))) files in
+  let debug lv fmt =
+    if lv <= verbose
+    then Format.printf ("@["^^fmt^^"@]@.")
+    else Format.ifprintf Format.std_formatter fmt
+  in
+  let () = debug 1 "v:%d@ o:%S@ fs:%a" verbose output (pp_list (pp_pair pp_file (pp_list pp_S))) files in
+  let files = List.map find files in
+  let () = debug 1 "files:@ %a" (pp_list pp_file) files in
   ()
 
 let () = main ()
