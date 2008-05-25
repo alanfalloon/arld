@@ -140,7 +140,7 @@ let sys cwd args =
       | Unix.WSTOPPED _ -> assert false
   end
 
-let main () =
+let main () = try
   let argv = Sys.argv in
   let verbose,output,files = parse_args argv in
   let debug lv fmt =
@@ -148,9 +148,9 @@ let main () =
     then Format.printf ("@["^^fmt^^"@]@.")
     else Format.ifprintf Format.std_formatter fmt
   in
-  let () = debug 1 "v:%d@ o:%S@ fs:%a" verbose output (pp_list (pp_pair pp_file (pp_list pp_S))) files in
+  let () = debug 3 "v:%d@ o:%S@ fs:%a" verbose output (pp_list (pp_pair pp_file (pp_list pp_S))) files in
   let files = List.map find files in
-  let () = debug 1 "files:@ %a" (pp_list pp_file) files in
+  let () = debug 3 "files:@ %a" (pp_list pp_file) files in
   let tmpd =
     let rec mkt i =
       try
@@ -162,9 +162,9 @@ let main () =
     in
     mkt 0
   in
-  let () = debug 1 "temp dir %S" tmpd in
+  let () = debug 2 "temp dir %S" tmpd in
   let sys cwd cmd =
-    debug 1 "%s: %a" cwd (pp_as pp_s) cmd;
+    debug 1 "%20s: %a" cwd (pp_as pp_s) cmd;
     sys cwd cmd
   in
   let add_to_tmp tmp = function
@@ -172,6 +172,14 @@ let main () =
     | Lib f -> sys tmp [|"ar";"x";f|]
   in
   let () = List.iter (add_to_tmp tmpd) files in
+  let ofiles = Sys.readdir tmpd in
+  let ofiles = Array.map (Filename.concat tmpd) ofiles in
+  let cmd = Array.append [|"ar";"crs";output|] ofiles in
+  let () = sys (Sys.getcwd()) cmd in
+  let () = sys (Sys.getcwd()) [|"rm";"-rf";tmpd|] in
   ()
+with Failure msg ->
+  Format.printf "@[%s@]@." msg;
+  exit 1
 
 let () = main ()
