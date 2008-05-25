@@ -103,10 +103,16 @@ let parse_args argv =
   (!verbose,output,!files)
 ;;
 
+let absolute_name fn =
+  if Filename.is_relative fn
+  then Filename.concat (Sys.getcwd()) fn
+  else fn
+
 let find (f,paths) =
   match f with
       Obj fn ->
-        if Sys.file_exists fn then f
+        let fn = absolute_name fn in
+        if Sys.file_exists fn then Obj fn
         else failprintf "cannot find %S" fn
     | Lib n ->
         let fn = Format.sprintf "lib%s.a" n in
@@ -116,6 +122,7 @@ let find (f,paths) =
           try List.find Sys.file_exists fns
           with Not_found -> failprintf "cannot find %S in %a" fn (pp_l pp_s) paths
         in
+        let fn = absolute_name fn in
         Lib fn
 ;;
 
