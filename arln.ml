@@ -20,6 +20,15 @@ let pp_l pp_elt fmt = function
       pp fmt "%a" pp_elt e1;
       List.iter (pp fmt ",@ %a" pp_elt) en;
       pp fmt "@]"
+let pp_a pp_elt fmt a = pp_l pp_elt fmt (Array.to_list a)
+let pp_ls pp_elt fmt = function
+    [] -> ()
+  | e1::en ->
+      pp fmt "@[<hov>";
+      pp fmt "%a" pp_elt e1;
+      List.iter (pp fmt "@ %a" pp_elt) en;
+      pp fmt "@]"
+let pp_as pp_elt fmt a = pp_ls pp_elt fmt (Array.to_list a)
 let pp_S fmt = pp fmt "%S"
 let pp_s = Format.pp_print_string
 let pp_pair pp1 pp2 fmt (e1,e2) =
@@ -110,6 +119,20 @@ let find (f,paths) =
         Lib fn
 ;;
 
+let sys cwd args =
+  let pid = Unix.fork () in
+  if 0 = pid then begin
+    let () = Sys.chdir cwd in
+    Unix.execvp args.(0) args
+  end else begin
+    let _, s = Unix.waitpid [] pid in
+    match s with
+        Unix.WEXITED 0 -> ()
+      | Unix.WEXITED x -> failprintf "'%a' exited with status %d" (pp_a pp_s) args x
+      | Unix.WSIGNALED x -> failprintf "'%a' killed with signal %d" (pp_a pp_s) args x
+      | Unix.WSTOPPED _ -> assert false
+  end
+
 let main () =
   let argv = Sys.argv in
   let verbose,output,files = parse_args argv in
@@ -121,6 +144,27 @@ let main () =
   let () = debug 1 "v:%d@ o:%S@ fs:%a" verbose output (pp_list (pp_pair pp_file (pp_list pp_S))) files in
   let files = List.map find files in
   let () = debug 1 "files:@ %a" (pp_list pp_file) files in
+  let tmpd =
+    let rec mkt i =
+      try
+        let d = Format.sprintf "arln%03d" i in
+        let d = Filename.concat Filename.temp_dir_name d in
+        let () = Unix.mkdir d 0o700 in
+        d
+      with Unix.Unix_error (Unix.EEXIST,_,_) -> mkt (i+1)
+    in
+    mkt 0
+  in
+  let () = debug 1 "temp dir %S" tmpd in
+  let sys cwd cmd =
+    debug 1 "%s: %a" cwd (pp_as pp_s) cmd;
+    sys cwd cmd
+  in
+  let add_to_tmp tmp = function
+      Obj f -> sys (Sys.getcwd()) [|"cp";f;tmp|]
+    | Lib f -> sys tmp [|"ar";"x";f|]
+  in
+  let () = List.iter (add_to_tmp tmpd) files in
   ()
 
 let () = main ()
