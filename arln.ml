@@ -40,7 +40,7 @@ let failprintf fmt =
   let fail _ =
     failwith (Buffer.contents b)
   in
-  Format.kfprintf fail f ("@["^^fmt^^"@]@.")
+  Format.kfprintf fail f ("@["^^fmt^^"@]@?")
 
 let default_paths = ["/lib"; "/usr/lib"]
 
@@ -103,9 +103,11 @@ let parse_args argv =
   (!verbose,output,!files)
 ;;
 
+let cwd = Sys.getcwd()
+
 let absolute_name fn =
   if Filename.is_relative fn
-  then Filename.concat (Sys.getcwd()) fn
+  then Filename.concat cwd fn
   else fn
 
 let find (f,paths) =
@@ -126,17 +128,17 @@ let find (f,paths) =
         Lib fn
 ;;
 
-let sys cwd args =
+let sys wd args =
   let pid = Unix.fork () in
   if 0 = pid then begin
-    let () = Sys.chdir cwd in
+    let () = Sys.chdir wd in
     Unix.execvp args.(0) args
   end else begin
     let _, s = Unix.waitpid [] pid in
     match s with
         Unix.WEXITED 0 -> ()
-      | Unix.WEXITED x -> failprintf "'%a' exited with status %d" (pp_a pp_s) args x
-      | Unix.WSIGNALED x -> failprintf "'%a' killed with signal %d" (pp_a pp_s) args x
+      | Unix.WEXITED x -> failprintf "'%a' exited with status %d" (pp_as pp_s) args x
+      | Unix.WSIGNALED x -> failprintf "'%a' killed with signal %d" (pp_as pp_s) args x
       | Unix.WSTOPPED _ -> assert false
   end
 
@@ -163,20 +165,20 @@ let main () = try
     mkt 0
   in
   let () = debug 2 "temp dir %S" tmpd in
-  let sys cwd cmd =
-    debug 1 "%20s: %a" cwd (pp_as pp_s) cmd;
-    sys cwd cmd
+  let sys wd cmd =
+    debug 1 "%20s: %a" wd (pp_as pp_s) cmd;
+    sys wd cmd
   in
   let add_to_tmp tmp = function
-      Obj f -> sys (Sys.getcwd()) [|"cp";f;tmp|]
+      Obj f -> sys cwd [|"cp";f;tmp|]
     | Lib f -> sys tmp [|"ar";"x";f|]
   in
   let () = List.iter (add_to_tmp tmpd) files in
   let ofiles = Sys.readdir tmpd in
   let ofiles = Array.map (Filename.concat tmpd) ofiles in
   let cmd = Array.append [|"ar";"crs";output|] ofiles in
-  let () = sys (Sys.getcwd()) cmd in
-  let () = sys (Sys.getcwd()) [|"rm";"-rf";tmpd|] in
+  let () = sys cwd cmd in
+  let () = sys cwd [|"rm";"-rf";tmpd|] in
   ()
 with Failure msg ->
   Format.printf "@[%s@]@." msg;
