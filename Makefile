@@ -1,4 +1,4 @@
-arln: arln.cmx
+arld: arld.cmx
 	ocamlopt.opt -o $@ unix.cmxa $<
-arln.cmx: arln.ml
+arld.cmx: arld.ml
 	ocamlopt.opt -dtypes -o $@ -c $<

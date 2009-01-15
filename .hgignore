@@ -1,7 +1,6 @@
-.hgignore
-arln
-arln.cmi
-arln.cmx
-arln.ml~
-arln.o
+arld
+arld.cmi
+arld.cmx
+arld.ml~
+arld.o
 Makefile~
