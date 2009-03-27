@@ -1,0 +1,36 @@
+arld -- The Static Library Linker
+=================================
+
+`arld` creates static libraries from object files and existing
+static libraries. Object files are specified on thier own, and
+libraries are specified with the `-l` switch just like when
+invoking the linker. The upshot is that you can create a new static
+library containing the contents of existing libraries plus your own
+object files by calling it in the same manner as if you were linking a
+shared-library.
+
+This command produces a new static library `libfoo.a` from `foo.o` and
+the object files in a pre-existing library `libbar.a` (found in
+`/lib/search/path` or the standard library paths):
+
+    arld -o libfoo.a foo.o -L/lib/search/path -lbar
+
+Usage
+-----
+
+    arld -o <output> [<object> | -l<library> | -L<path>]
+
+<table>
+<tr><td>-o</td><td>Specify the output file (required)</td></tr>
+<tr><td>-L</td><td>Add a path to search for libraries</td></tr>
+<tr><td>-l</td><td>Add a library</td></tr>
+<tr><td>-v</td><td>Be more verbose. You can use this flag more than once to be even more verbose.</td></tr>
+</table>
+
+When object files with the same name appear more than once (including
+object files in libraries), then the object file earlier in the
+command line takes precedence.
+
+Arld does not pay attention to the symbols in the library files, so if
+there are object files with the same symbols, then it will do whatever
+your system version of `ar` would do.
